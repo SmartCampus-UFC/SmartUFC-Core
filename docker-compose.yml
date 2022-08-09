@@ -1,0 +1,138 @@
+version: '3.9'
+
+x-kong-config: &kong-env
+  KONG_DATABASE: ${KONG_DATABASE}
+  KONG_PG_DATABASE: ${KONG_PG_DATABASE}
+  KONG_PG_HOST: ${KONG_PG_HOST}
+  KONG_PG_USER: ${KONG_PG_USER}
+  KONG_PG_PASSWORD_FILE: /run/secrets/kong_postgres_password
+
+# Volumes
+volumes:
+  kong_data: {}
+  kong_prefix_vol:
+    driver_opts:
+     type: tmpfs
+     device: tmpfs
+  kong_tmp_vol:
+    driver_opts:
+     type: tmpfs
+     device: tmpfs
+
+# Network
+networks:
+  main-net:
+    ipam:
+      config:
+        - subnet: 192.168.100.0/24
+
+services:
+  kong-migrations:
+    image: kong:${KONG_VERSION}
+    command: kong migrations bootstrap
+    profiles: ["database"]
+    depends_on:
+      - db
+    environment:
+      <<: *kong-env
+    secrets:
+      - kong_postgres_password
+    networks:
+      - main-net
+    restart: on-failure
+
+  kong-migrations-up:
+    image: kong:${KONG_VERSION}
+    command: kong migrations up && kong migrations finish
+    profiles: ["database"]
+    depends_on:
+      - db
+    environment:
+      <<: *kong-env
+    secrets:
+      - kong_postgres_password
+    networks:
+      - main-net
+    restart: on-failure
+
+  kong:
+    image: kong:${KONG_VERSION}
+    user: "kong"
+    hostname: kong
+    container_name: core-kong
+    environment:
+      <<: *kong-env
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_PROXY_LISTEN: "0.0.0.0:8000"
+      KONG_ADMIN_LISTEN: "0.0.0.0:8001"
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_PREFIX: ${KONG_PREFIX}
+      KONG_DECLARATIVE_CONFIG: "/opt/kong/kong.yaml"
+    secrets:
+      - kong_postgres_password
+    networks:
+      - main-net
+    ports:      
+      - "0.0.0.0:7000:8000/tcp"
+      - "0.0.0.0:8443:8443/tcp"
+      - "127.0.0.1:8001:8001/tcp"
+      - "127.0.0.1:8444:8444/tcp"
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    restart: on-failure:5
+    read_only: true
+    volumes:
+      - kong_prefix_vol:${KONG_PREFIX}
+      - kong_tmp_vol:/tmp
+      - ./config:/opt/kong
+    security_opt:
+      - no-new-privileges
+
+  db:
+    image: postgres:9.5
+    hostname: db
+    container_name: core-db
+    profiles: ["database"]
+    environment:
+      POSTGRES_DB: ${KONG_PG_DATABASE}
+      POSTGRES_USER: ${KONG_PG_USER}
+      POSTGRES_PASSWORD_FILE: /run/secrets/kong_postgres_password
+    secrets:
+      - kong_postgres_password
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${KONG_PG_USER}"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+    restart: on-failure
+    stdin_open: true
+    tty: true
+    networks:
+      - main-net
+    volumes:
+      - kong_data:/var/lib/postgresql/data
+
+  grafana:
+    image: grafana/grafana:${GRAFANA_VERSION}
+    user: "${USER_ID}"
+    hostname: grafana
+    container_name: grafana
+    networks:
+      - main-net
+    depends_on:
+      - kong
+    ports:
+      - "5000:3000"
+    environment:
+      - GF_INSTALL_PLUGINS=https://github.com/orchestracities/grafana-map-plugin/archive/master.zip;grafana-map-plugin,grafana-clock-panel,grafana-worldmap-panel
+    volumes:
+      - ${GRAFANA_DATA_PATH}:/var/lib/grafana
+
+secrets:
+  kong_postgres_password:
+    file: ./POSTGRES_PASSWORD
