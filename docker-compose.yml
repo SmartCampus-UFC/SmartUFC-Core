@@ -129,7 +129,7 @@ services:
     ports:
       - "5000:3000"
     environment:
-      - GF_INSTALL_PLUGINS=https://github.com/orchestracities/grafana-map-plugin/archive/master.zip;grafana-map-plugin,grafana-clock-panel,grafana-worldmap-panel
+      - GF_INSTALL_PLUGINS=grafana-map-plugin,grafana-clock-panel,grafana-worldmap-panel,cloudspout-button-panel
     volumes:
       - ${GRAFANA_DATA_PATH}:/var/lib/grafana
 
