@@ -85,7 +85,7 @@ services:
       interval: 10s
       timeout: 10s
       retries: 10
-    restart: on-failure:5
+    restart: on-failure
     read_only: true
     volumes:
       - kong_prefix_vol:${KONG_PREFIX}
@@ -186,6 +186,7 @@ services:
       - main-net
     depends_on:
       - kong
+    restart: on-failure
     ports:
       - "5000:3000"
     environment:
