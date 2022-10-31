@@ -22,7 +22,7 @@ loadData () {
 	waitForDatabase
 	waitForKong	
 	docker run --rm -v $(pwd)/data/provision-api.sh:/provision-api.sh \
-		--network smartufc_main-net \
+		--network smartufc_core-net \
 		--entrypoint /bin/ash curlimages/curl provision-api.sh
 	echo ""
 }
