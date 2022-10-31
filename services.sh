@@ -5,7 +5,7 @@
 
 set -e
 export USER_ID=$(id -u)
-dockerCmd="docker-compose"
+dockerCmd="docker compose"
 
 if (( $# < 1 )); then
     echo "Illegal number of parameters"
@@ -22,7 +22,7 @@ loadData () {
 	waitForDatabase
 	waitForKong	
 	docker run --rm -v $(pwd)/data/provision-api.sh:/provision-api.sh \
-		--network smartufc_core-net \
+		--network ${COMPOSE_PROJECT_NAME}_core-net \
 		--entrypoint /bin/ash curlimages/curl provision-api.sh
 	echo ""
 }
